@@ -7,14 +7,15 @@ class SplashView extends StatefulWidget {
   const SplashView({
     super.key,
     required this.onContinue,
-    required this.onLogin
+    required this.onLogin,
   });
 
   @override
   State<SplashView> createState() => _SplashViewState();
 }
 
-class _SplashViewState extends State<SplashView> with SingleTickerProviderStateMixin {
+class _SplashViewState extends State<SplashView>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
@@ -27,13 +28,15 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
       duration: const Duration(milliseconds: 800),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
 
-    _opacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
-    );
+    _opacityAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
 
     _controller.forward();
   }
@@ -93,7 +96,7 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
                       const SizedBox(height: 32),
 
                       const Text(
-                        "SmartCharge",
+                        "SmartCharge KH",
                         style: TextStyle(
                           fontSize: 36,
                           fontWeight: FontWeight.bold,
@@ -103,7 +106,7 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        "Welcome to SmartCharge!",
+                        "Welcome to SmartCharge KH!",
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
@@ -178,10 +181,7 @@ class _SplashViewState extends State<SplashView> with SingleTickerProviderStateM
         ),
         child: Text(
           label,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
     );
