@@ -21,18 +21,22 @@ class QuickChargeApp extends StatelessWidget {
       home: Builder(
         builder: (context) => SplashView(
           onContinue: () {
-            // TODO: Navigate to Map Screen
-            debugPrint("Continue as Guest pressed");
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (context) => const HomeShell()),
+            );
           },
           onLogin: () {
             // Navigate to AuthView
             Navigator.of(context).push(
-              MaterialPageRoute(
+              MaterialPageRoute<void>(
                 builder: (context) => AuthView(
                   onAuthSuccess: (user, token) {
                     debugPrint("Authenticated as: ${user['email']}");
-                    // Navigate to home/map after successful login
-                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (context) => const HomeShell(),
+                      ),
+                    );
                   },
                 ),
               ),

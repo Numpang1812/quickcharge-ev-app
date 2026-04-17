@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'tabbed_home.dart';
 
 class SplashView extends StatefulWidget {
   final VoidCallback onContinue;
@@ -184,6 +185,29 @@ class _SplashViewState extends State<SplashView>
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
+    );
+  }
+}
+
+class HomeShell extends StatefulWidget {
+  const HomeShell({super.key});
+
+  @override
+  State<HomeShell> createState() => _HomeShellState();
+}
+
+class _HomeShellState extends State<HomeShell> {
+  int _currentIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return TabbedHomeScreen(
+      currentIndex: _currentIndex,
+      onTabTapped: (int i) {
+        setState(() {
+          _currentIndex = i;
+        });
+      },
     );
   }
 }

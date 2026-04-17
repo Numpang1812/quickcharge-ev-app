@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AuthView extends StatefulWidget {
-  final Function(Map<String, dynamic> user, String token) onAuthSuccess;
+  final void Function(Map<String, dynamic> user, String token) onAuthSuccess;
 
   const AuthView({super.key, required this.onAuthSuccess});
 
@@ -34,7 +34,7 @@ class _AuthViewState extends State<AuthView> {
     });
 
     try {
-      await Future.delayed(const Duration(seconds: 1)); // placeholder
+      await Future<void>.delayed(const Duration(seconds: 1)); // placeholder
       widget.onAuthSuccess({'email': email}, 'mock_token');
     } catch (e) {
       setState(() {
@@ -290,7 +290,7 @@ class _AuthViewState extends State<AuthView> {
     required String label,
     required IconData icon,
     bool obscure = false,
-    required Function(String) onChanged,
+    required void Function(String) onChanged,
     required String? Function(String?) validator,
   }) {
     return Padding(
