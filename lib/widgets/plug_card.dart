@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
+import '../theme/app_colors.dart';
 
 class PlugCard extends StatelessWidget {
   final String label;
@@ -24,22 +24,19 @@ class PlugCard extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: isSelected
               ? const LinearGradient(
-            colors: [
-              AppColors.primaryGreen,
-              AppColors.primaryGreenDark,
-            ],
-          )
+                  colors: [AppColors.primaryGreen, AppColors.primaryGreenDark],
+                )
               : null,
           color: isSelected ? null : AppColors.chipBackground,
           borderRadius: BorderRadius.circular(20),
           boxShadow: isSelected
               ? [
-            BoxShadow(
-              color: AppColors.primaryGreen.withOpacity(0.18),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ]
+                  BoxShadow(
+                    color: AppColors.primaryGreen.withOpacity(0.18),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ]
               : [],
         ),
         child: Column(
