@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
-import 'operator_chip.dart';
-import 'plug_card.dart';
-import 'speed_chip.dart';
+import '../theme/app_colors.dart';
+import '../widgets/operator_chip.dart';
+import '../widgets/plug_card.dart';
+import '../widgets/speed_chip.dart';
 
 class FilterStationsScreen extends StatefulWidget {
   const FilterStationsScreen({super.key});
@@ -35,7 +35,7 @@ class _FilterStationsScreenState extends State<FilterStationsScreen> {
       SnackBar(
         content: Text(
           'Applied: $selectedOperator, $selectedPlug, $selectedSpeed, '
-              '\$${selectedPrice.start.toStringAsFixed(2)} - \$${selectedPrice.end.toStringAsFixed(2)}',
+          '\$${selectedPrice.start.toStringAsFixed(2)} - \$${selectedPrice.end.toStringAsFixed(2)}',
         ),
       ),
     );

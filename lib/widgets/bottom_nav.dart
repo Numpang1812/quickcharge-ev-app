@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
+import '../theme/app_colors.dart';
 
 class BottomNav extends StatelessWidget {
   const BottomNav({super.key});
@@ -10,9 +10,7 @@ class BottomNav extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
       decoration: const BoxDecoration(
         color: AppColors.white,
-        border: Border(
-          top: BorderSide(color: AppColors.border),
-        ),
+        border: Border(top: BorderSide(color: AppColors.border)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,

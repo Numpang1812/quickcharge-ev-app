@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
+import '../theme/app_colors.dart';
 
 class OperatorChip extends StatelessWidget {
   final String label;
@@ -23,22 +23,19 @@ class OperatorChip extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: isSelected
               ? const LinearGradient(
-            colors: [
-              AppColors.primaryGreen,
-              AppColors.primaryGreenDark,
-            ],
-          )
+                  colors: [AppColors.primaryGreen, AppColors.primaryGreenDark],
+                )
               : null,
           color: isSelected ? null : AppColors.chipBackground,
           borderRadius: BorderRadius.circular(18),
           boxShadow: isSelected
               ? [
-            BoxShadow(
-              color: AppColors.primaryGreen.withOpacity(0.18),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ]
+                  BoxShadow(
+                    color: AppColors.primaryGreen.withOpacity(0.18),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ]
               : [],
         ),
         child: Text(
