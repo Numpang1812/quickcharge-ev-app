@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import 'calculator.dart';
+import 'map.dart';
 import 'profile.dart';
 
 class TabbedHomeScreen extends StatelessWidget {
@@ -18,7 +19,7 @@ class TabbedHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      const _MapPage(),
+      const MapScreen(),
       const CalculatorScreen(),
       const _TrackerPage(),
       const ProfileScreen(),
@@ -26,10 +27,7 @@ class TabbedHomeScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F2F7),
-      body: IndexedStack(
-        index: currentIndex,
-        children: pages,
-      ),
+      body: IndexedStack(index: currentIndex, children: pages),
       bottomNavigationBar: _BottomNavBar(
         currentIndex: currentIndex,
         onTap: onTabTapped,
@@ -80,14 +78,17 @@ class _BottomNavBar extends StatelessWidget {
             children: List.generate(_items.length, (i) {
               final item = _items[i];
               final isActive = i == currentIndex;
-              final color =
-                  isActive ? const Color(0xFF2563EB) : const Color(0xFF94A3B8);
+              final color = isActive
+                  ? const Color(0xFF2563EB)
+                  : const Color(0xFF94A3B8);
               return GestureDetector(
                 onTap: () => onTap(i),
                 behavior: HitTestBehavior.opaque,
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -121,19 +122,8 @@ class _NavItemData {
 }
 
 // ---------------------------------------------------------------------------
-// Placeholder pages for Map, Tracker
+// Placeholder page for Tracker
 // ---------------------------------------------------------------------------
-
-class _MapPage extends StatelessWidget {
-  const _MapPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SafeArea(
-      child: SizedBox(), // empty page
-    );
-  }
-}
 
 class _TrackerPage extends StatelessWidget {
   const _TrackerPage();
@@ -376,10 +366,7 @@ class _SessionRow extends StatelessWidget {
               ),
               Text(
                 '$date · $kwh',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF94A3B8),
-                ),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
               ),
             ],
           ),
