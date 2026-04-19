@@ -31,14 +31,11 @@ class _FilterStationsScreenState extends State<FilterStationsScreen> {
   }
 
   void applyFilters() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Applied: $selectedOperator, $selectedPlug, $selectedSpeed, '
-          '\$${selectedPrice.start.toStringAsFixed(2)} - \$${selectedPrice.end.toStringAsFixed(2)}',
-        ),
-      ),
-    );
+    Navigator.pop(context, {
+      'operator': selectedOperator,
+      'plug': selectedPlug,
+      'speed': selectedSpeed,
+    });
   }
 
   @override
