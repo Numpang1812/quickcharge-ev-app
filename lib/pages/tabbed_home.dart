@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import 'calculator.dart';
+import 'carbon_tracker.dart';
 import 'map.dart';
 import 'profile.dart';
 
@@ -21,7 +22,7 @@ class TabbedHomeScreen extends StatelessWidget {
     final pages = [
       const MapScreen(),
       const CalculatorScreen(),
-      const _TrackerPage(),
+      const CarbonTrackerScreen(),
       const ProfileScreen(),
     ];
 
@@ -121,20 +122,7 @@ class _NavItemData {
   const _NavItemData({required this.icon, required this.label});
 }
 
-// ---------------------------------------------------------------------------
-// Placeholder page for Tracker
-// ---------------------------------------------------------------------------
-
-class _TrackerPage extends StatelessWidget {
-  const _TrackerPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SafeArea(
-      child: SizedBox(), // empty page
-    );
-  }
-}
+// Tracker tab now uses CarbonTrackerScreen from carbon_tracker.dart
 
 // ---------------------------------------------------------------------------
 // Friend's additional widgets (kept for completeness)
