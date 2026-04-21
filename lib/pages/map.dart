@@ -91,7 +91,15 @@ class _MapScreenState extends State<MapScreen> {
     return lat >= 10.0 && lat <= 15.0 && lng >= 102.0 && lng <= 108.5;
   }
 
+  /// Check if a coordinate falls within Cambodia's bounding box
+  /// (roughly lat 10.0–15.0, lng 102.0–108.5)
+  bool _isInCambodia(double lat, double lng) {
+    return lat >= 10.0 && lat <= 15.0 && lng >= 102.0 && lng <= 108.5;
+  }
+
   Future<void> _getCurrentLocation() async {
+    // For emulator or if GPS is unavailable, we default to Phnom Penh
+    const LatLng phnomPenh = LatLng(11.5564, 104.9282);
     // For emulator or if GPS is unavailable, we default to Phnom Penh
     const LatLng phnomPenh = LatLng(11.5564, 104.9282);
 
@@ -102,25 +110,91 @@ class _MapScreenState extends State<MapScreen> {
         setState(() => _currentLocation = phnomPenh);
         return;
       }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          debugPrint('Location permission denied, using Phnom Penh default.');
+      try {
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!serviceEnabled) {
+          debugPrint('Location services disabled, using Phnom Penh default.');
           setState(() => _currentLocation = phnomPenh);
           return;
         }
-      }
 
-      if (permission == LocationPermission.deniedForever) {
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+          if (permission == LocationPermission.denied) {
+            debugPrint('Location permission denied, using Phnom Penh default.');
+            setState(() => _currentLocation = phnomPenh);
+            return;
+          }
+        }
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+          if (permission == LocationPermission.denied) {
+            debugPrint('Location permission denied, using Phnom Penh default.');
+            setState(() => _currentLocation = phnomPenh);
+            return;
+          }
+        }
+
+        if (permission == LocationPermission.deniedForever) {
+          debugPrint(
+            'Location permission permanently denied, using Phnom Penh default.',
+          );
+          setState(() => _currentLocation = phnomPenh);
+          return;
+        }
+
+        // Try getting the last known position first — the emulator may already
+        // have a manually-set location cached.
+        Position? lastKnown = await Geolocator.getLastKnownPosition();
         debugPrint(
-          'Location permission permanently denied, using Phnom Penh default.',
+          'Last known position: ${lastKnown?.latitude}, ${lastKnown?.longitude}',
         );
-        setState(() => _currentLocation = phnomPenh);
-        return;
-      }
 
+        // Now request a fresh fix using compatible parameters
+        Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 10),
+        );
+
+        debugPrint('GPS fix: (${position.latitude}, ${position.longitude})');
+
+        // Decide which position to use. Prefer the fresh fix if it's in
+        // Cambodia; otherwise fall back to lastKnown if *that* is in Cambodia.
+        LatLng? chosen;
+
+        if (_isInCambodia(position.latitude, position.longitude)) {
+          chosen = LatLng(position.latitude, position.longitude);
+          debugPrint('Fresh GPS fix is inside Cambodia — using it.');
+        } else if (lastKnown != null &&
+            _isInCambodia(lastKnown.latitude, lastKnown.longitude)) {
+          chosen = LatLng(lastKnown.latitude, lastKnown.longitude);
+          debugPrint(
+            'Fresh fix outside Cambodia (${position.latitude}, ${position.longitude}), '
+            'but last-known is inside Cambodia — using last-known.',
+          );
+        }
+
+        if (chosen != null) {
+          setState(() => _currentLocation = chosen);
+          // Move camera to the validated location if we're initializing
+          if (_routePoints.isEmpty) {
+            _mapController.move(chosen, 15.0);
+          }
+        } else {
+          // Both fixes are outside Cambodia (e.g. emulator default 37.42, -122.08)
+          debugPrint(
+            'GPS fix (${position.latitude}, ${position.longitude}) is outside Cambodia '
+            '(emulator default?). Falling back to Phnom Penh.',
+          );
+          setState(() => _currentLocation = phnomPenh);
+          _mapController.move(phnomPenh, 15.0);
+        }
+      } catch (e) {
+        debugPrint('Error getting location, falling back to Phnom Penh: $e');
+        setState(() => _currentLocation = phnomPenh);
+      }
       // Try getting the last known position first — the emulator may already
       // have a manually-set location cached.
       Position? lastKnown = await Geolocator.getLastKnownPosition();
