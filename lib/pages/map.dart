@@ -47,19 +47,36 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _initializeData() async {
     try {
-      await dotenv.load(fileName: ".env");
-      
+      // Load environment variables safely
+      try {
+        await dotenv.load(fileName: ".env");
+      } catch (e) {
+        debugPrint('Warning: Could not load .env file: $e');
+      }
+
       final orsKey = dotenv.env['ORS_API_KEY'] ?? '';
       final mapsKey = dotenv.env['GOOGLE_MAP_API'] ?? '';
       final tursoUrl = dotenv.env['TURSO_URL'] ?? '';
       final tursoToken = dotenv.env['TURSO_TOKEN'] ?? '';
-      
-      RouteService.loadEnvManual(orsKey);
-      GoogleMapsService.loadEnvManual(mapsKey);
-      TursoService.loadEnvManual(tursoUrl, tursoToken);
+
+      if (orsKey.isNotEmpty) {
+        RouteService.loadEnvManual(orsKey);
+      }
+      if (mapsKey.isNotEmpty) {
+        GoogleMapsService.loadEnvManual(mapsKey);
+      }
+      if (tursoUrl.isNotEmpty && tursoToken.isNotEmpty) {
+        TursoService.loadEnvManual(tursoUrl, tursoToken);
+      }
 
       await _getCurrentLocation();
       await _loadStations();
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       setState(() {
         _errorMessage = 'Error: $e';
@@ -97,7 +114,9 @@ class _MapScreenState extends State<MapScreen> {
       }
 
       if (permission == LocationPermission.deniedForever) {
-        debugPrint('Location permission permanently denied, using Phnom Penh default.');
+        debugPrint(
+          'Location permission permanently denied, using Phnom Penh default.',
+        );
         setState(() => _currentLocation = phnomPenh);
         return;
       }
@@ -105,7 +124,9 @@ class _MapScreenState extends State<MapScreen> {
       // Try getting the last known position first — the emulator may already
       // have a manually-set location cached.
       Position? lastKnown = await Geolocator.getLastKnownPosition();
-      debugPrint('Last known position: ${lastKnown?.latitude}, ${lastKnown?.longitude}');
+      debugPrint(
+        'Last known position: ${lastKnown?.latitude}, ${lastKnown?.longitude}',
+      );
 
       // Now request a fresh fix using compatible parameters
       Position position = await Geolocator.getCurrentPosition(
@@ -127,20 +148,22 @@ class _MapScreenState extends State<MapScreen> {
         chosen = LatLng(lastKnown.latitude, lastKnown.longitude);
         debugPrint(
           'Fresh fix outside Cambodia (${position.latitude}, ${position.longitude}), '
-          'but last-known is inside Cambodia — using last-known.');
+          'but last-known is inside Cambodia — using last-known.',
+        );
       }
 
       if (chosen != null) {
         setState(() => _currentLocation = chosen);
         // Move camera to the validated location if we're initializing
         if (_routePoints.isEmpty) {
-           _mapController.move(chosen, 15.0);
+          _mapController.move(chosen, 15.0);
         }
       } else {
         // Both fixes are outside Cambodia (e.g. emulator default 37.42, -122.08)
         debugPrint(
           'GPS fix (${position.latitude}, ${position.longitude}) is outside Cambodia '
-          '(emulator default?). Falling back to Phnom Penh.');
+          '(emulator default?). Falling back to Phnom Penh.',
+        );
         setState(() => _currentLocation = phnomPenh);
         _mapController.move(phnomPenh, 15.0);
       }
@@ -151,6 +174,8 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _loadStations() async {
+    if (!mounted) return;
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -161,44 +186,72 @@ class _MapScreenState extends State<MapScreen> {
       final localStations = await _databaseService.getAllStations();
 
       if (localStations.isNotEmpty) {
-        setState(() {
-          _stations = localStations;
-          _applyFilters();
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _stations = localStations;
+            _applyFilters();
+            _isLoading = false;
+          });
+        }
       }
 
-      // Fetch fresh data from Turso API instead of Google Maps
-      final apiStations = await TursoService.fetchStations();
+      // Only try to fetch fresh data from Turso API if we have credentials
+      final tursoUrl = dotenv.env['TURSO_URL'];
+      final tursoToken = dotenv.env['TURSO_TOKEN'];
 
-      if (apiStations.isNotEmpty) {
-        // Save to database
-        await _databaseService.deleteAllStations();
-        await _databaseService.insertStations(apiStations);
+      if (tursoUrl != null &&
+          tursoUrl.isNotEmpty &&
+          tursoToken != null &&
+          tursoToken.isNotEmpty) {
+        try {
+          final apiStations = await TursoService.fetchStations();
 
-        setState(() {
-          _stations = apiStations;
-          _applyFilters();
-          _isLoading = false;
-        });
-      } else if (localStations.isEmpty) {
-        setState(() {
-          _errorMessage = 'No charging stations found';
-          _isLoading = false;
-        });
+          if (apiStations.isNotEmpty) {
+            // Save to database
+            await _databaseService.deleteAllStations();
+            await _databaseService.insertStations(apiStations);
+
+            if (mounted) {
+              setState(() {
+                _stations = apiStations;
+                _applyFilters();
+                _isLoading = false;
+              });
+            }
+          } else if (localStations.isEmpty) {
+            if (mounted) {
+              setState(() {
+                _errorMessage = 'No charging stations found';
+                _isLoading = false;
+              });
+            }
+          }
+        } catch (apiError) {
+          debugPrint('API fetch failed: $apiError');
+          // Continue with local data
+          if (localStations.isEmpty && mounted) {
+            setState(() {
+              _errorMessage =
+                  'No cached data available. Please configure API credentials.';
+              _isLoading = false;
+            });
+          }
+        }
+      } else {
+        // No credentials provided
+        if (localStations.isEmpty && mounted) {
+          setState(() {
+            _errorMessage =
+                'No charging stations cached. Please configure API credentials in .env';
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
-      // If API fails, try to use cached data
-      final localStations = await _databaseService.getAllStations();
-      if (localStations.isNotEmpty) {
+      debugPrint('Error loading stations: $e');
+      if (mounted) {
         setState(() {
-          _stations = localStations;
-          _applyFilters();
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _errorMessage = 'Failed to load stations: $e';
+          _errorMessage = 'Error loading stations: ${e.toString()}';
           _isLoading = false;
         });
       }
@@ -256,7 +309,9 @@ class _MapScreenState extends State<MapScreen> {
     });
 
     try {
-      debugPrint('Routing from ${_currentLocation!.latitude},${_currentLocation!.longitude} to ${destination.latitude},${destination.longitude}');
+      debugPrint(
+        'Routing from ${_currentLocation!.latitude},${_currentLocation!.longitude} to ${destination.latitude},${destination.longitude}',
+      );
       final routeData = await RouteService.getRoute(
         _currentLocation!,
         destination,
