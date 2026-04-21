@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-// ── Entry point ─────────────────────────────────────────────────────────────
-
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -11,7 +9,6 @@ class ProfileScreen extends StatelessWidget {
       child: SingleChildScrollView(
         child: Column(
           children: [
-            // ── Header card ──────────────────────────────────────────────
             Container(
               color: Colors.white,
               width: double.infinity,
@@ -75,9 +72,6 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: 24),
                   Row(
                     children: [
-                      Expanded(
-                        child: _StatCard(label: 'BALANCE', value: '\$42.50'),
-                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: _StatCard(label: 'POINTS', value: '1,240'),
@@ -90,7 +84,6 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: 28),
 
-            // ── Account Settings ─────────────────────────────────────────
             _SettingsSection(
               label: 'ACCOUNT SETTINGS',
               items: [
@@ -109,7 +102,6 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: 28),
 
-            // ── Support ──────────────────────────────────────────────────
             _SettingsSection(
               label: 'SUPPORT',
               items: [
@@ -128,7 +120,6 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: 28),
 
-            // ── Danger zone ──────────────────────────────────────────────
             _SettingsSection(
               label: 'ACCOUNT',
               items: [
@@ -190,10 +181,6 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Stat Card
-// ---------------------------------------------------------------------------
-
 class _StatCard extends StatelessWidget {
   final String label;
   final String value;
@@ -235,10 +222,6 @@ class _StatCard extends StatelessWidget {
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// Settings Section
-// ---------------------------------------------------------------------------
 
 class _SettingsItemData {
   final IconData icon;
@@ -370,9 +353,6 @@ class _SettingsRow extends StatelessWidget {
   }
 }
 
-// ===========================================================================
-// SIGN IN SCREEN
-// ===========================================================================
 
 class SignInScreen extends StatelessWidget {
   const SignInScreen({super.key});
@@ -458,12 +438,6 @@ class SignInScreen extends StatelessWidget {
   }
 }
 
-// ===========================================================================
-// DESTINATION SCREENS
-// ===========================================================================
-
-// ── Shared scaffold ─────────────────────────────────────────────────────────
-
 class _DetailScaffold extends StatelessWidget {
   final String title;
   final Widget body;
@@ -499,8 +473,6 @@ class _DetailScaffold extends StatelessWidget {
     );
   }
 }
-
-// ── Helper widgets ───────────────────────────────────────────────────────────
 
 class _SectionCard extends StatelessWidget {
   final List<Widget> children;
@@ -608,10 +580,6 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// 1. Notifications
-// ---------------------------------------------------------------------------
-
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
 
@@ -714,10 +682,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// 2. Privacy & Security (with working Change Password)
-// ---------------------------------------------------------------------------
 
 class PrivacySecurityScreen extends StatefulWidget {
   const PrivacySecurityScreen({super.key});
@@ -1003,10 +967,6 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// 3. Help Center (with search functionality)
-// ---------------------------------------------------------------------------
-
 class HelpCenterScreen extends StatefulWidget {
   const HelpCenterScreen({super.key});
 
@@ -1233,10 +1193,6 @@ class _FaqTileState extends State<_FaqTile> {
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// 4. Contact Support
-// ---------------------------------------------------------------------------
 
 class ContactSupportScreen extends StatefulWidget {
   const ContactSupportScreen({super.key});
