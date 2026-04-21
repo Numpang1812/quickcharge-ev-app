@@ -54,6 +54,13 @@ class _HomeNavigationWrapperState extends State<_HomeNavigationWrapper> {
   int _currentTabIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // Check if user is already logged in
+    _isAuthenticated = SupabaseService.currentUser != null;
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (!_isAuthenticated) {
       return SplashView(
@@ -68,6 +75,7 @@ class _HomeNavigationWrapperState extends State<_HomeNavigationWrapper> {
               builder: (context) => AuthView(
                 onAuthSuccess: (user, token) {
                   debugPrint("Authenticated as: ${user['email']}");
+                  Navigator.pop(context); // Close the AuthView
                   setState(() {
                     _isAuthenticated = true;
                   });

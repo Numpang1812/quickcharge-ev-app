@@ -54,6 +54,14 @@ class _AuthViewState extends State<AuthView> {
           password: password,
           name: name,
         );
+
+        if (response.session == null) {
+          setState(() {
+            error = "Signup successful! Please check your email for confirmation link.";
+          });
+          return;
+        }
+
         widget.onAuthSuccess({
           'email': response.user?.email,
           'id': response.user?.id,

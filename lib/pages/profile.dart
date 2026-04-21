@@ -97,7 +97,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   // Name
                   Text(
-                    userName ?? 'Loading...',
+                    userName ?? 'Guest',
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
@@ -112,7 +112,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        userEmail ?? 'No email found',
+                        userEmail ?? 'Guest Email',
                         style: const TextStyle(
                           fontSize: 14,
                           color: Color(0xFF64748B),
@@ -122,18 +122,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Balance & Points stat cards
-                  const Row(
-                    children: [
-                      Expanded(
-                        child: _StatCard(label: 'BALANCE', value: '\$42.50'),
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: _StatCard(label: 'POINTS', value: '1,240'),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -219,12 +207,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              // Navigate to Sign In page and clear all previous routes
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const SignInScreen()),
-                (route) => false,
-              );
+              _handleSignOut();
             },
             child: const Text(
               'Sign Out',
@@ -294,7 +277,6 @@ class _SettingsItemData {
   final IconData icon;
   final String label;
   final bool isDestructive;
-  final VoidCallback? onTap;
   final Widget? destination;
   final void Function(BuildContext)? onTap;
 
@@ -302,7 +284,6 @@ class _SettingsItemData {
     required this.icon,
     required this.label,
     this.isDestructive = false,
-    this.onTap,
     this.destination,
     this.onTap,
   });
@@ -423,93 +404,6 @@ class _SettingsRow extends StatelessWidget {
 }
 
 // ===========================================================================
-// SIGN IN SCREEN
-// ===========================================================================
-
-class SignInScreen extends StatelessWidget {
-  const SignInScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.person, size: 80, color: Color(0xFF49B63C)),
-              const SizedBox(height: 32),
-              const Text(
-                'Welcome Back',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Sign in to continue',
-                style: TextStyle(fontSize: 16, color: Color(0xFF64748B)),
-              ),
-              const SizedBox(height: 48),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  prefixIcon: const Icon(Icons.email_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Navigate back to profile
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ProfileScreen(),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF49B63C),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Sign In',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 // ===========================================================================
 // DESTINATION SCREENS
 // ===========================================================================
