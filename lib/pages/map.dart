@@ -53,12 +53,12 @@ class _MapScreenState extends State<MapScreen> {
       } catch (e) {
         debugPrint('Warning: Could not load .env file: $e');
       }
-      
+
       final orsKey = dotenv.env['ORS_API_KEY'] ?? '';
       final mapsKey = dotenv.env['GOOGLE_MAP_API'] ?? '';
       final tursoUrl = dotenv.env['TURSO_URL'] ?? '';
       final tursoToken = dotenv.env['TURSO_TOKEN'] ?? '';
-      
+
       if (orsKey.isNotEmpty) {
         RouteService.loadEnvManual(orsKey);
       }
@@ -71,66 +71,111 @@ class _MapScreenState extends State<MapScreen> {
 
       await _getCurrentLocation();
       await _loadStations();
-      
+
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('Initialization error: $e');
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Initialization error: ${e.toString()}';
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _errorMessage = 'Error: $e';
+        _isLoading = false;
+      });
     }
   }
 
-  Future<void> _getCurrentLocation() async {
-    try {
-      bool serviceEnabled;
-      LocationPermission permission;
+  /// Check if a coordinate falls within Cambodia's bounding box
+  /// (roughly lat 10.0–15.0, lng 102.0–108.5)
+  bool _isInCambodia(double lat, double lng) {
+    return lat >= 10.0 && lat <= 15.0 && lng >= 102.0 && lng <= 108.5;
+  }
 
-      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  Future<void> _getCurrentLocation() async {
+    // For emulator or if GPS is unavailable, we default to Phnom Penh
+    const LatLng phnomPenh = LatLng(11.5564, 104.9282);
+
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        debugPrint('Location services are disabled.');
+        debugPrint('Location services disabled, using Phnom Penh default.');
+        setState(() => _currentLocation = phnomPenh);
         return;
       }
 
-      permission = await Geolocator.checkPermission();
+      LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          debugPrint('Location permissions are denied');
+          debugPrint('Location permission denied, using Phnom Penh default.');
+          setState(() => _currentLocation = phnomPenh);
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        debugPrint('Location permissions are permanently denied');
+        debugPrint(
+          'Location permission permanently denied, using Phnom Penh default.',
+        );
+        setState(() => _currentLocation = phnomPenh);
         return;
       }
 
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+      // Try getting the last known position first — the emulator may already
+      // have a manually-set location cached.
+      Position? lastKnown = await Geolocator.getLastKnownPosition();
+      debugPrint(
+        'Last known position: ${lastKnown?.latitude}, ${lastKnown?.longitude}',
       );
 
-      if (mounted) {
-        setState(() {
-          _currentLocation = LatLng(position.latitude, position.longitude);
-        });
+      // Now request a fresh fix using compatible parameters
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+
+      debugPrint('GPS fix: (${position.latitude}, ${position.longitude})');
+
+      // Decide which position to use. Prefer the fresh fix if it's in
+      // Cambodia; otherwise fall back to lastKnown if *that* is in Cambodia.
+      LatLng? chosen;
+
+      if (_isInCambodia(position.latitude, position.longitude)) {
+        chosen = LatLng(position.latitude, position.longitude);
+        debugPrint('Fresh GPS fix is inside Cambodia — using it.');
+      } else if (lastKnown != null &&
+          _isInCambodia(lastKnown.latitude, lastKnown.longitude)) {
+        chosen = LatLng(lastKnown.latitude, lastKnown.longitude);
+        debugPrint(
+          'Fresh fix outside Cambodia (${position.latitude}, ${position.longitude}), '
+          'but last-known is inside Cambodia — using last-known.',
+        );
+      }
+
+      if (chosen != null) {
+        setState(() => _currentLocation = chosen);
+        // Move camera to the validated location if we're initializing
+        if (_routePoints.isEmpty) {
+          _mapController.move(chosen, 15.0);
+        }
+      } else {
+        // Both fixes are outside Cambodia (e.g. emulator default 37.42, -122.08)
+        debugPrint(
+          'GPS fix (${position.latitude}, ${position.longitude}) is outside Cambodia '
+          '(emulator default?). Falling back to Phnom Penh.',
+        );
+        setState(() => _currentLocation = phnomPenh);
+        _mapController.move(phnomPenh, 15.0);
       }
     } catch (e) {
-      debugPrint('Error getting current location: $e');
-      // Continue with default location
+      debugPrint('Error getting location, falling back to Phnom Penh: $e');
+      setState(() => _currentLocation = phnomPenh);
     }
   }
 
   Future<void> _loadStations() async {
     if (!mounted) return;
-    
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -153,8 +198,11 @@ class _MapScreenState extends State<MapScreen> {
       // Only try to fetch fresh data from Turso API if we have credentials
       final tursoUrl = dotenv.env['TURSO_URL'];
       final tursoToken = dotenv.env['TURSO_TOKEN'];
-      
-      if (tursoUrl != null && tursoUrl.isNotEmpty && tursoToken != null && tursoToken.isNotEmpty) {
+
+      if (tursoUrl != null &&
+          tursoUrl.isNotEmpty &&
+          tursoToken != null &&
+          tursoToken.isNotEmpty) {
         try {
           final apiStations = await TursoService.fetchStations();
 
@@ -183,7 +231,8 @@ class _MapScreenState extends State<MapScreen> {
           // Continue with local data
           if (localStations.isEmpty && mounted) {
             setState(() {
-              _errorMessage = 'No cached data available. Please configure API credentials.';
+              _errorMessage =
+                  'No cached data available. Please configure API credentials.';
               _isLoading = false;
             });
           }
@@ -192,7 +241,8 @@ class _MapScreenState extends State<MapScreen> {
         // No credentials provided
         if (localStations.isEmpty && mounted) {
           setState(() {
-            _errorMessage = 'No charging stations cached. Please configure API credentials in .env';
+            _errorMessage =
+                'No charging stations cached. Please configure API credentials in .env';
             _isLoading = false;
           });
         }
@@ -225,8 +275,30 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _calculateRouteToDestination(LatLng destination) async {
     if (_currentLocation == null) {
+      await _getCurrentLocation();
+    }
+
+    // Safety check for (0,0) or suspicious coordinates
+    if (_currentLocation!.latitude.abs() < 0.01 &&
+        _currentLocation!.longitude.abs() < 0.01) {
+      setState(() => _errorMessage = 'Invalid current location (near 0,0).');
+      return;
+    }
+
+    // Sanity check: if distance is > 5000km, it's almost certainly a coordinate error for Cambodia
+    final double distanceMeters = Geolocator.distanceBetween(
+      _currentLocation!.latitude,
+      _currentLocation!.longitude,
+      destination.latitude,
+      destination.longitude,
+    );
+
+    if (distanceMeters > 5000000) {
       setState(() {
-        _errorMessage = 'Please enable location first';
+        _errorMessage =
+            'Destination too far (${(distanceMeters / 1000).toStringAsFixed(0)} km). '
+            'Current: ${_currentLocation!.latitude.toStringAsFixed(2)},${_currentLocation!.longitude.toStringAsFixed(2)}. '
+            'Dest: ${destination.latitude.toStringAsFixed(2)},${destination.longitude.toStringAsFixed(2)}.';
       });
       return;
     }
@@ -237,6 +309,9 @@ class _MapScreenState extends State<MapScreen> {
     });
 
     try {
+      debugPrint(
+        'Routing from ${_currentLocation!.latitude},${_currentLocation!.longitude} to ${destination.latitude},${destination.longitude}',
+      );
       final routeData = await RouteService.getRoute(
         _currentLocation!,
         destination,
@@ -347,13 +422,43 @@ class _MapScreenState extends State<MapScreen> {
                   style: const TextStyle(fontSize: 16),
                 ),
               ],
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Close'),
-                ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _calculateRouteToDestination(
+                          LatLng(station.latitude, station.longitude),
+                        );
+                      },
+                      icon: const Icon(Icons.directions),
+                      label: const Text('Directions'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -410,9 +515,6 @@ class _MapScreenState extends State<MapScreen> {
                           child: GestureDetector(
                             onTap: () {
                               _showStationDetails(station);
-                              _calculateRouteToDestination(
-                                LatLng(station.latitude, station.longitude),
-                              );
                             },
                             child: const Icon(
                               Icons.ev_station,
@@ -499,6 +601,28 @@ class _MapScreenState extends State<MapScreen> {
                     },
                     child: const Icon(Icons.remove),
                   ),
+                  const SizedBox(height: 8),
+                  FloatingActionButton(
+                    heroTag: 'my_location',
+                    mini: true,
+                    onPressed: () async {
+                      await _getCurrentLocation();
+                      if (_currentLocation != null) {
+                        _mapController.move(_currentLocation!, 15.0);
+                      }
+                    },
+                    child: const Icon(Icons.my_location),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_routePoints.isNotEmpty)
+                    FloatingActionButton(
+                      heroTag: 'clear_route',
+                      mini: true,
+                      onPressed: _clearRoute,
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      child: const Icon(Icons.close),
+                    ),
                 ],
               ),
             ),
