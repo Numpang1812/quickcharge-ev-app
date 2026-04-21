@@ -47,58 +47,90 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _initializeData() async {
     try {
-      await dotenv.load(fileName: ".env");
+      // Load environment variables safely
+      try {
+        await dotenv.load(fileName: ".env");
+      } catch (e) {
+        debugPrint('Warning: Could not load .env file: $e');
+      }
       
       final orsKey = dotenv.env['ORS_API_KEY'] ?? '';
       final mapsKey = dotenv.env['GOOGLE_MAP_API'] ?? '';
       final tursoUrl = dotenv.env['TURSO_URL'] ?? '';
       final tursoToken = dotenv.env['TURSO_TOKEN'] ?? '';
       
-      RouteService.loadEnvManual(orsKey);
-      GoogleMapsService.loadEnvManual(mapsKey);
-      TursoService.loadEnvManual(tursoUrl, tursoToken);
+      if (orsKey.isNotEmpty) {
+        RouteService.loadEnvManual(orsKey);
+      }
+      if (mapsKey.isNotEmpty) {
+        GoogleMapsService.loadEnvManual(mapsKey);
+      }
+      if (tursoUrl.isNotEmpty && tursoToken.isNotEmpty) {
+        TursoService.loadEnvManual(tursoUrl, tursoToken);
+      }
 
       await _getCurrentLocation();
       await _loadStations();
+      
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Error: $e';
-        _isLoading = false;
-      });
+      debugPrint('Initialization error: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Initialization error: ${e.toString()}';
+          _isLoading = false;
+        });
+      }
     }
   }
 
   Future<void> _getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+    try {
+      bool serviceEnabled;
+      LocationPermission permission;
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return;
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        debugPrint('Location services are disabled.');
         return;
       }
+
+      permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          debugPrint('Location permissions are denied');
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        debugPrint('Location permissions are permanently denied');
+        return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      if (mounted) {
+        setState(() {
+          _currentLocation = LatLng(position.latitude, position.longitude);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error getting current location: $e');
+      // Continue with default location
     }
-
-    if (permission == LocationPermission.deniedForever) {
-      return;
-    }
-
-    Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-
-    setState(() {
-      _currentLocation = LatLng(position.latitude, position.longitude);
-    });
   }
 
   Future<void> _loadStations() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -109,44 +141,67 @@ class _MapScreenState extends State<MapScreen> {
       final localStations = await _databaseService.getAllStations();
 
       if (localStations.isNotEmpty) {
-        setState(() {
-          _stations = localStations;
-          _applyFilters();
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _stations = localStations;
+            _applyFilters();
+            _isLoading = false;
+          });
+        }
       }
 
-      // Fetch fresh data from Turso API instead of Google Maps
-      final apiStations = await TursoService.fetchStations();
+      // Only try to fetch fresh data from Turso API if we have credentials
+      final tursoUrl = dotenv.env['TURSO_URL'];
+      final tursoToken = dotenv.env['TURSO_TOKEN'];
+      
+      if (tursoUrl != null && tursoUrl.isNotEmpty && tursoToken != null && tursoToken.isNotEmpty) {
+        try {
+          final apiStations = await TursoService.fetchStations();
 
-      if (apiStations.isNotEmpty) {
-        // Save to database
-        await _databaseService.deleteAllStations();
-        await _databaseService.insertStations(apiStations);
+          if (apiStations.isNotEmpty) {
+            // Save to database
+            await _databaseService.deleteAllStations();
+            await _databaseService.insertStations(apiStations);
 
-        setState(() {
-          _stations = apiStations;
-          _applyFilters();
-          _isLoading = false;
-        });
-      } else if (localStations.isEmpty) {
-        setState(() {
-          _errorMessage = 'No charging stations found';
-          _isLoading = false;
-        });
+            if (mounted) {
+              setState(() {
+                _stations = apiStations;
+                _applyFilters();
+                _isLoading = false;
+              });
+            }
+          } else if (localStations.isEmpty) {
+            if (mounted) {
+              setState(() {
+                _errorMessage = 'No charging stations found';
+                _isLoading = false;
+              });
+            }
+          }
+        } catch (apiError) {
+          debugPrint('API fetch failed: $apiError');
+          // Continue with local data
+          if (localStations.isEmpty && mounted) {
+            setState(() {
+              _errorMessage = 'No cached data available. Please configure API credentials.';
+              _isLoading = false;
+            });
+          }
+        }
+      } else {
+        // No credentials provided
+        if (localStations.isEmpty && mounted) {
+          setState(() {
+            _errorMessage = 'No charging stations cached. Please configure API credentials in .env';
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
-      // If API fails, try to use cached data
-      final localStations = await _databaseService.getAllStations();
-      if (localStations.isNotEmpty) {
+      debugPrint('Error loading stations: $e');
+      if (mounted) {
         setState(() {
-          _stations = localStations;
-          _applyFilters();
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _errorMessage = 'Failed to load stations: $e';
+          _errorMessage = 'Error loading stations: ${e.toString()}';
           _isLoading = false;
         });
       }
