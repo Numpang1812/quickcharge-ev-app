@@ -1,7 +1,51 @@
 import 'package:flutter/material.dart';
+import '../services/supabase_service.dart';
+import '../main.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  String? userName;
+  String? userEmail;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  void _loadUserData() {
+    final user = SupabaseService.currentUser;
+    if (user != null) {
+      setState(() {
+        userEmail = user.email;
+        // Try to get name from metadata
+        userName = (user.userMetadata?['full_name'] as String?) ?? 
+                   (user.userMetadata?['name'] as String?) ?? 
+                   'EV Explorer';
+      });
+    }
+  }
+
+  Future<void> _handleSignOut() async {
+    try {
+      await SupabaseService.signOut();
+      if (mounted) {
+        // Restart the app by going back to the root widget
+        Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const QuickChargeApp()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      debugPrint("Error signing out: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,9 +95,9 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: 14),
 
                   // Name
-                  const Text(
-                    'Leo Fernandez',
-                    style: TextStyle(
+                  Text(
+                    userName ?? 'Loading...',
+                    style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
                       color: Color(0xFF0F172A),
@@ -62,13 +106,13 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
 
-                  // Subtitle row
+                  // Email
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
-                        'leofernandez@localhost',
-                        style: TextStyle(
+                      Text(
+                        userEmail ?? 'No email found',
+                        style: const TextStyle(
                           fontSize: 14,
                           color: Color(0xFF64748B),
                         ),
@@ -78,12 +122,12 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // Balance & Points stat cards
-                  Row(
+                  const Row(
                     children: [
                       Expanded(
                         child: _StatCard(label: 'BALANCE', value: '\$42.50'),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: 12),
                       Expanded(
                         child: _StatCard(label: 'POINTS', value: '1,240'),
                       ),
@@ -96,9 +140,9 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 28),
 
             // ── Account Settings ─────────────────────────────────────────
-            _SettingsSection(
+            const _SettingsSection(
               label: 'ACCOUNT SETTINGS',
-              items: const [
+              items: [
                 _SettingsItemData(
                   icon: Icons.credit_card_outlined,
                   label: 'Payment Methods',
@@ -117,9 +161,9 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 28),
 
             // ── Support ──────────────────────────────────────────────────
-            _SettingsSection(
+            const _SettingsSection(
               label: 'SUPPORT',
-              items: const [
+              items: [
                 _SettingsItemData(
                   icon: Icons.help_outline,
                   label: 'Help Center',
@@ -136,11 +180,12 @@ class ProfileScreen extends StatelessWidget {
             // ── Danger zone ──────────────────────────────────────────────
             _SettingsSection(
               label: 'ACCOUNT',
-              items: const [
+              items: [
                 _SettingsItemData(
                   icon: Icons.logout,
                   label: 'Sign Out',
                   isDestructive: true,
+                  onTap: _handleSignOut,
                 ),
               ],
             ),
@@ -207,11 +252,13 @@ class _SettingsItemData {
   final IconData icon;
   final String label;
   final bool isDestructive;
+  final VoidCallback? onTap;
 
   const _SettingsItemData({
     required this.icon,
     required this.label,
     this.isDestructive = false,
+    this.onTap,
   });
 }
 
@@ -292,7 +339,7 @@ class _SettingsRow extends StatelessWidget {
     return Material(
       color: Colors.white,
       child: InkWell(
-        onTap: () {},
+        onTap: item.onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Row(
