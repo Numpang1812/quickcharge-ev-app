@@ -31,9 +31,9 @@ class _MapScreenState extends State<MapScreen> {
   String? _errorMessage;
 
   // Filter criteria
-  String? _selectedOperator;
-  String? _selectedPlug;
-  String? _selectedSpeed;
+  String _selectedOperator = 'All';
+  String _selectedLocation = 'All';
+  String _selectedSpeed = 'All';
 
   // Routing
   List<LatLng> _routePoints = [];
@@ -258,17 +258,51 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  static const Map<String, LatLng> _provinceCenters = {
+    'Phnom Penh': LatLng(11.5564, 104.9282),
+    'Siem Reap': LatLng(13.3633, 103.8567),
+    'Preah Sihanouk': LatLng(10.6253, 103.5234),
+    'Battambang': LatLng(13.0957, 103.2022),
+    'Kampot': LatLng(10.6108, 104.1815),
+    'Kep': LatLng(10.4820, 104.3167),
+    'Ratanakiri': LatLng(13.7394, 106.9941),
+    'Mondulkiri': LatLng(12.4558, 107.1881),
+    'Pursat': LatLng(12.5333, 103.9167),
+  };
+
   void _applyFilters() {
     _filteredStations = _stations.where((station) {
-      if (_selectedOperator != null && station.operator != _selectedOperator) {
+      // Operator filter
+      if (_selectedOperator != 'All' && station.operator != _selectedOperator) {
         return false;
       }
-      if (_selectedPlug != null && !station.plugTypes.contains(_selectedPlug)) {
+
+      // Location/Province filter (check radius of 30km from city center)
+      if (_selectedLocation != 'All') {
+        final center = _provinceCenters[_selectedLocation];
+        if (center != null) {
+          final distance = Geolocator.distanceBetween(
+            station.latitude,
+            station.longitude,
+            center.latitude,
+            center.longitude,
+          );
+          if (distance > 30000) return false; // 30km radius
+        } else {
+          // Fallback to string match if coordinate not found
+          final locLower = _selectedLocation.toLowerCase();
+          final addrMatch =
+              station.address?.toLowerCase().contains(locLower) ?? false;
+          final nameMatch = station.name.toLowerCase().contains(locLower);
+          if (!addrMatch && !nameMatch) return false;
+        }
+      }
+
+      // Speed filter
+      if (_selectedSpeed != 'All' && station.chargingSpeed != _selectedSpeed) {
         return false;
       }
-      if (_selectedSpeed != null && station.chargingSpeed != _selectedSpeed) {
-        return false;
-      }
+
       return true;
     }).toList();
   }
@@ -642,10 +676,18 @@ class _MapScreenState extends State<MapScreen> {
                     );
                     if (result != null) {
                       setState(() {
-                        _selectedOperator = result['operator'];
-                        _selectedPlug = result['plug'];
-                        _selectedSpeed = result['speed'];
+                        _selectedOperator = result['operator'] ?? 'All';
+                        _selectedLocation = result['location'] ?? 'All';
+                        _selectedSpeed = result['speed'] ?? 'All';
                         _applyFilters();
+
+                        // If a specific location was selected, move the map there
+                        if (_selectedLocation != 'All') {
+                          final center = _provinceCenters[_selectedLocation];
+                          if (center != null) {
+                            _mapController.move(center, 12.0);
+                          }
+                        }
                       });
                     }
                   },

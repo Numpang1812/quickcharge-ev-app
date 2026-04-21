@@ -12,28 +12,42 @@ class FilterStationsScreen extends StatefulWidget {
 }
 
 class _FilterStationsScreenState extends State<FilterStationsScreen> {
-  String selectedOperator = 'EcoCharge';
-  String selectedPlug = 'CCS';
-  String selectedSpeed = 'Fast';
-  RangeValues selectedPrice = const RangeValues(0.10, 0.45);
+  String selectedOperator = 'All';
+  String selectedLocation = 'All';
+  String selectedSpeed = 'All';
+  RangeValues selectedPrice = const RangeValues(0.00, 1.00);
 
-  final List<String> operators = ['EcoCharge', 'SmartCharge', 'FastVolt'];
-  final List<String> plugs = ['CCS', 'Type 2', 'CHAdeMO', 'Tesla'];
-  final List<String> speeds = ['Normal', 'Fast', 'Ultra Fast'];
+  final List<String> operators = [
+    'All',
+    'Charge+',
+  ];
+  final List<String> locations = [
+    'All',
+    'Phnom Penh',
+    'Siem Reap',
+    'Preah Sihanouk',
+    'Battambang',
+    'Kampot',
+    'Kep',
+    'Ratanakiri',
+    'Mondulkiri',
+    'Pursat'
+  ];
+  final List<String> speeds = ['All', 'Normal', 'Fast', 'Ultra Fast'];
 
   void resetFilters() {
     setState(() {
-      selectedOperator = 'EcoCharge';
-      selectedPlug = 'CCS';
-      selectedSpeed = 'Fast';
-      selectedPrice = const RangeValues(0.10, 0.45);
+      selectedOperator = 'All';
+      selectedLocation = 'All';
+      selectedSpeed = 'All';
+      selectedPrice = const RangeValues(0.00, 1.00);
     });
   }
 
   void applyFilters() {
     Navigator.pop(context, {
       'operator': selectedOperator,
-      'plug': selectedPlug,
+      'location': selectedLocation,
       'speed': selectedSpeed,
     });
   }
@@ -71,18 +85,18 @@ class _FilterStationsScreenState extends State<FilterStationsScreen> {
                     ),
                     const SizedBox(height: 32),
 
-                    _buildSectionTitle('PLUG TYPES'),
+                    _buildSectionTitle('LOCATIONS'),
                     const SizedBox(height: 16),
                     Wrap(
-                      spacing: 14,
-                      runSpacing: 14,
-                      children: plugs.map((item) {
-                        return PlugCard(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: locations.map((item) {
+                        return OperatorChip(
                           label: item,
-                          isSelected: selectedPlug == item,
+                          isSelected: selectedLocation == item,
                           onTap: () {
                             setState(() {
-                              selectedPlug = item;
+                              selectedLocation = item;
                             });
                           },
                         );
@@ -95,7 +109,7 @@ class _FilterStationsScreenState extends State<FilterStationsScreen> {
                       children: [
                         _buildSectionTitle('PRICE RANGE'),
                         Text(
-                          '\$${selectedPrice.start.toStringAsFixed(2)} - \$${selectedPrice.end.toStringAsFixed(2)}',
+                          '\$${selectedPrice.start.toStringAsFixed(2)} - \$${selectedPrice.end.toStringAsFixed(2)}/kWh',
                           style: const TextStyle(
                             color: AppColors.sectionTitle,
                             fontSize: 16,
@@ -121,9 +135,9 @@ class _FilterStationsScreenState extends State<FilterStationsScreen> {
                       ),
                       child: RangeSlider(
                         values: selectedPrice,
-                        min: 0.10,
-                        max: 0.45,
-                        divisions: 35,
+                        min: 0.00,
+                        max: 1.50,
+                        divisions: 15,
                         onChanged: (values) {
                           setState(() {
                             selectedPrice = values;
@@ -138,7 +152,7 @@ class _FilterStationsScreenState extends State<FilterStationsScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            '\$0.10',
+                            '\$0.00',
                             style: TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 14,
@@ -146,7 +160,7 @@ class _FilterStationsScreenState extends State<FilterStationsScreen> {
                             ),
                           ),
                           Text(
-                            '\$0.45',
+                            '\$1.50',
                             style: TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 14,

@@ -1,9 +1,53 @@
 import 'package:flutter/material.dart';
+import '../services/supabase_service.dart';
+import '../main.dart';
 
 // ── Entry point ─────────────────────────────────────────────────────────────
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  String? userName;
+  String? userEmail;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  void _loadUserData() {
+    final user = SupabaseService.currentUser;
+    if (user != null) {
+      setState(() {
+        userEmail = user.email;
+        // Try to get name from metadata
+        userName = (user.userMetadata?['full_name'] as String?) ?? 
+                   (user.userMetadata?['name'] as String?) ?? 
+                   'EV Explorer';
+      });
+    }
+  }
+
+  Future<void> _handleSignOut() async {
+    try {
+      await SupabaseService.signOut();
+      if (mounted) {
+        // Restart the app by going back to the root widget
+        Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const QuickChargeApp()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      debugPrint("Error signing out: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,9 +94,11 @@ class ProfileScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  const Text(
-                    'Leo Fernandez',
-                    style: TextStyle(
+
+                  // Name
+                  Text(
+                    userName ?? 'Guest',
+                    style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
                       color: Color(0xFF0F172A),
@@ -60,12 +106,14 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
+
+                  // Email
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
+                    children: [
                       Text(
-                        'leofernandez@localhost',
-                        style: TextStyle(
+                        userEmail ?? 'Guest Email',
+                        style: const TextStyle(
                           fontSize: 14,
                           color: Color(0xFF64748B),
                         ),
@@ -73,17 +121,7 @@ class ProfileScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatCard(label: 'BALANCE', value: '\$42.50'),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _StatCard(label: 'POINTS', value: '1,240'),
-                      ),
-                    ],
-                  ),
+
                 ],
               ),
             ),
@@ -91,7 +129,7 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 28),
 
             // ── Account Settings ─────────────────────────────────────────
-            _SettingsSection(
+            const _SettingsSection(
               label: 'ACCOUNT SETTINGS',
               items: [
                 _SettingsItemData(
@@ -110,7 +148,7 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 28),
 
             // ── Support ──────────────────────────────────────────────────
-            _SettingsSection(
+            const _SettingsSection(
               label: 'SUPPORT',
               items: [
                 _SettingsItemData(
@@ -169,12 +207,7 @@ class ProfileScreen extends StatelessWidget {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              // Navigate to Sign In page and clear all previous routes
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const SignInScreen()),
-                (route) => false,
-              );
+              _handleSignOut();
             },
             child: const Text(
               'Sign Out',
@@ -371,93 +404,6 @@ class _SettingsRow extends StatelessWidget {
 }
 
 // ===========================================================================
-// SIGN IN SCREEN
-// ===========================================================================
-
-class SignInScreen extends StatelessWidget {
-  const SignInScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.person, size: 80, color: Color(0xFF49B63C)),
-              const SizedBox(height: 32),
-              const Text(
-                'Welcome Back',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Sign in to continue',
-                style: TextStyle(fontSize: 16, color: Color(0xFF64748B)),
-              ),
-              const SizedBox(height: 48),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  prefixIcon: const Icon(Icons.email_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Navigate back to profile
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ProfileScreen(),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF49B63C),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Sign In',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 // ===========================================================================
 // DESTINATION SCREENS
 // ===========================================================================

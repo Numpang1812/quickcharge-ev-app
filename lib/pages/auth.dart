@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../services/supabase_service.dart';
+
 
 class AuthView extends StatefulWidget {
   final void Function(Map<String, dynamic> user, String token) onAuthSuccess;
@@ -34,11 +39,37 @@ class _AuthViewState extends State<AuthView> {
     });
 
     try {
-      await Future<void>.delayed(const Duration(seconds: 1)); // placeholder
-      widget.onAuthSuccess({'email': email}, 'mock_token');
+      if (isLogin) {
+        final response = await SupabaseService.signIn(
+          email: email,
+          password: password,
+        );
+        widget.onAuthSuccess({
+          'email': response.user?.email,
+          'id': response.user?.id,
+        }, response.session?.accessToken ?? '');
+      } else {
+        final response = await SupabaseService.signUp(
+          email: email,
+          password: password,
+          name: name,
+        );
+
+        if (response.session == null) {
+          setState(() {
+            error = "Signup successful! Please check your email for confirmation link.";
+          });
+          return;
+        }
+
+        widget.onAuthSuccess({
+          'email': response.user?.email,
+          'id': response.user?.id,
+        }, response.session?.accessToken ?? '');
+      }
     } catch (e) {
       setState(() {
-        error = 'Authentication failed';
+        error = e.toString().replaceAll('Exception:', '').trim();
       });
     } finally {
       setState(() {
@@ -46,6 +77,57 @@ class _AuthViewState extends State<AuthView> {
       });
     }
   }
+
+  Future<void> handleGoogleSignIn() async {
+    setState(() {
+      error = '';
+      loading = true;
+    });
+
+    try {
+      // 1. Initialize Google Sign In (v7.x uses singleton pattern)
+      final googleSignIn = GoogleSignIn.instance;
+      await googleSignIn.initialize(
+        serverClientId: dotenv.env['GOOGLE_WEB_CLIENT_ID'],
+      );
+
+      // 2. Authenticate the user (v7.x uses authenticate() instead of signIn())
+      final GoogleSignInAccount account = await googleSignIn.authenticate();
+
+      // 3. Get the ID token
+      final idToken = account.authentication.idToken;
+
+      if (idToken == null) {
+        throw Exception("Could not retrieve Google ID Token.");
+      }
+
+      // 4. Sign in to Supabase using the ID Token
+      final response = await SupabaseService.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+      );
+
+      // 5. Success
+      widget.onAuthSuccess({
+        'email': response.user?.email,
+        'id': response.user?.id,
+        'name': response.user?.userMetadata?['full_name'],
+      }, response.session?.accessToken ?? '');
+
+    } catch (e) {
+      debugPrint("Google Sign In Error: $e");
+      setState(() {
+        error = e.toString().replaceAll('Exception:', '').trim();
+      });
+    } finally {
+      setState(() {
+        loading = false;
+      });
+    }
+  }
+
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -179,9 +261,35 @@ class _AuthViewState extends State<AuthView> {
                                 ],
                               ),
                             ),
+                            const SizedBox(height: 24),
+                            
+                            // Divider
+                            Row(
+                              children: [
+                                Expanded(child: Divider(color: Colors.grey[300])),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 16),
+                                  child: Text(
+                                    "OR",
+                                    style: TextStyle(
+                                      color: textMutedColor,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(child: Divider(color: Colors.grey[300])),
+                              ],
+                            ),
+                            
+                            const SizedBox(height: 24),
+                            
+                            // Google SSO Button
+                            _buildGoogleButton(),
                           ],
                         ),
                       ),
+
 
                       const SizedBox(height: 20),
 
@@ -327,7 +435,40 @@ class _AuthViewState extends State<AuthView> {
     );
   }
 
+  Widget _buildGoogleButton() {
+    return GestureDetector(
+      onTap: loading ? null : handleGoogleSignIn,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.network(
+              'https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png',
+              height: 24,
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              "Continue with Google",
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSubmitButton() {
+
     return GestureDetector(
       onTap: loading ? null : handleSubmit,
       child: AnimatedContainer(

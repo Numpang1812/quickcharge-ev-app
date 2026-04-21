@@ -5,7 +5,18 @@ import 'package:quickcharge_ev_app/pages/tabbed_home.dart';
 import 'dart:io' show Platform;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-void main() {
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:quickcharge_ev_app/services/supabase_service.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load environment variables
+  await dotenv.load(fileName: ".env");
+  
+  // Initialize Supabase
+  await SupabaseService.initialize();
+  
   // Initialize sqflite for desktop platforms (Windows, macOS, Linux)
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     sqfliteFfiInit();
@@ -43,6 +54,13 @@ class _HomeNavigationWrapperState extends State<_HomeNavigationWrapper> {
   int _currentTabIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // Check if user is already logged in
+    _isAuthenticated = SupabaseService.currentUser != null;
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (!_isAuthenticated) {
       return SplashView(
@@ -57,6 +75,7 @@ class _HomeNavigationWrapperState extends State<_HomeNavigationWrapper> {
               builder: (context) => AuthView(
                 onAuthSuccess: (user, token) {
                   debugPrint("Authenticated as: ${user['email']}");
+                  Navigator.pop(context); // Close the AuthView
                   setState(() {
                     _isAuthenticated = true;
                   });
