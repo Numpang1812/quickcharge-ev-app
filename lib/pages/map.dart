@@ -47,19 +47,36 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _initializeData() async {
     try {
-      await dotenv.load(fileName: ".env");
-      
+      // Load environment variables safely
+      try {
+        await dotenv.load(fileName: ".env");
+      } catch (e) {
+        debugPrint('Warning: Could not load .env file: $e');
+      }
+
       final orsKey = dotenv.env['ORS_API_KEY'] ?? '';
       final mapsKey = dotenv.env['GOOGLE_MAP_API'] ?? '';
       final tursoUrl = dotenv.env['TURSO_URL'] ?? '';
       final tursoToken = dotenv.env['TURSO_TOKEN'] ?? '';
-      
-      RouteService.loadEnvManual(orsKey);
-      GoogleMapsService.loadEnvManual(mapsKey);
-      TursoService.loadEnvManual(tursoUrl, tursoToken);
+
+      if (orsKey.isNotEmpty) {
+        RouteService.loadEnvManual(orsKey);
+      }
+      if (mapsKey.isNotEmpty) {
+        GoogleMapsService.loadEnvManual(mapsKey);
+      }
+      if (tursoUrl.isNotEmpty && tursoToken.isNotEmpty) {
+        TursoService.loadEnvManual(tursoUrl, tursoToken);
+      }
 
       await _getCurrentLocation();
       await _loadStations();
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       setState(() {
         _errorMessage = 'Error: $e';
@@ -74,7 +91,15 @@ class _MapScreenState extends State<MapScreen> {
     return lat >= 10.0 && lat <= 15.0 && lng >= 102.0 && lng <= 108.5;
   }
 
+  /// Check if a coordinate falls within Cambodia's bounding box
+  /// (roughly lat 10.0–15.0, lng 102.0–108.5)
+  bool _isInCambodia(double lat, double lng) {
+    return lat >= 10.0 && lat <= 15.0 && lng >= 102.0 && lng <= 108.5;
+  }
+
   Future<void> _getCurrentLocation() async {
+    // For emulator or if GPS is unavailable, we default to Phnom Penh
+    const LatLng phnomPenh = LatLng(11.5564, 104.9282);
     // For emulator or if GPS is unavailable, we default to Phnom Penh
     const LatLng phnomPenh = LatLng(11.5564, 104.9282);
 
@@ -85,27 +110,97 @@ class _MapScreenState extends State<MapScreen> {
         setState(() => _currentLocation = phnomPenh);
         return;
       }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          debugPrint('Location permission denied, using Phnom Penh default.');
+      try {
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!serviceEnabled) {
+          debugPrint('Location services disabled, using Phnom Penh default.');
           setState(() => _currentLocation = phnomPenh);
           return;
         }
-      }
 
-      if (permission == LocationPermission.deniedForever) {
-        debugPrint('Location permission permanently denied, using Phnom Penh default.');
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+          if (permission == LocationPermission.denied) {
+            debugPrint('Location permission denied, using Phnom Penh default.');
+            setState(() => _currentLocation = phnomPenh);
+            return;
+          }
+        }
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+          if (permission == LocationPermission.denied) {
+            debugPrint('Location permission denied, using Phnom Penh default.');
+            setState(() => _currentLocation = phnomPenh);
+            return;
+          }
+        }
+
+        if (permission == LocationPermission.deniedForever) {
+          debugPrint(
+            'Location permission permanently denied, using Phnom Penh default.',
+          );
+          setState(() => _currentLocation = phnomPenh);
+          return;
+        }
+
+        // Try getting the last known position first — the emulator may already
+        // have a manually-set location cached.
+        Position? lastKnown = await Geolocator.getLastKnownPosition();
+        debugPrint(
+          'Last known position: ${lastKnown?.latitude}, ${lastKnown?.longitude}',
+        );
+
+        // Now request a fresh fix using compatible parameters
+        Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 10),
+        );
+
+        debugPrint('GPS fix: (${position.latitude}, ${position.longitude})');
+
+        // Decide which position to use. Prefer the fresh fix if it's in
+        // Cambodia; otherwise fall back to lastKnown if *that* is in Cambodia.
+        LatLng? chosen;
+
+        if (_isInCambodia(position.latitude, position.longitude)) {
+          chosen = LatLng(position.latitude, position.longitude);
+          debugPrint('Fresh GPS fix is inside Cambodia — using it.');
+        } else if (lastKnown != null &&
+            _isInCambodia(lastKnown.latitude, lastKnown.longitude)) {
+          chosen = LatLng(lastKnown.latitude, lastKnown.longitude);
+          debugPrint(
+            'Fresh fix outside Cambodia (${position.latitude}, ${position.longitude}), '
+            'but last-known is inside Cambodia — using last-known.',
+          );
+        }
+
+        if (chosen != null) {
+          setState(() => _currentLocation = chosen);
+          // Move camera to the validated location if we're initializing
+          if (_routePoints.isEmpty) {
+            _mapController.move(chosen, 15.0);
+          }
+        } else {
+          // Both fixes are outside Cambodia (e.g. emulator default 37.42, -122.08)
+          debugPrint(
+            'GPS fix (${position.latitude}, ${position.longitude}) is outside Cambodia '
+            '(emulator default?). Falling back to Phnom Penh.',
+          );
+          setState(() => _currentLocation = phnomPenh);
+          _mapController.move(phnomPenh, 15.0);
+        }
+      } catch (e) {
+        debugPrint('Error getting location, falling back to Phnom Penh: $e');
         setState(() => _currentLocation = phnomPenh);
-        return;
       }
-
       // Try getting the last known position first — the emulator may already
       // have a manually-set location cached.
       Position? lastKnown = await Geolocator.getLastKnownPosition();
-      debugPrint('Last known position: ${lastKnown?.latitude}, ${lastKnown?.longitude}');
+      debugPrint(
+        'Last known position: ${lastKnown?.latitude}, ${lastKnown?.longitude}',
+      );
 
       // Now request a fresh fix using compatible parameters
       Position position = await Geolocator.getCurrentPosition(
@@ -127,20 +222,22 @@ class _MapScreenState extends State<MapScreen> {
         chosen = LatLng(lastKnown.latitude, lastKnown.longitude);
         debugPrint(
           'Fresh fix outside Cambodia (${position.latitude}, ${position.longitude}), '
-          'but last-known is inside Cambodia — using last-known.');
+          'but last-known is inside Cambodia — using last-known.',
+        );
       }
 
       if (chosen != null) {
         setState(() => _currentLocation = chosen);
         // Move camera to the validated location if we're initializing
         if (_routePoints.isEmpty) {
-           _mapController.move(chosen, 15.0);
+          _mapController.move(chosen, 15.0);
         }
       } else {
         // Both fixes are outside Cambodia (e.g. emulator default 37.42, -122.08)
         debugPrint(
           'GPS fix (${position.latitude}, ${position.longitude}) is outside Cambodia '
-          '(emulator default?). Falling back to Phnom Penh.');
+          '(emulator default?). Falling back to Phnom Penh.',
+        );
         setState(() => _currentLocation = phnomPenh);
         _mapController.move(phnomPenh, 15.0);
       }
@@ -151,6 +248,8 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _loadStations() async {
+    if (!mounted) return;
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -161,44 +260,72 @@ class _MapScreenState extends State<MapScreen> {
       final localStations = await _databaseService.getAllStations();
 
       if (localStations.isNotEmpty) {
-        setState(() {
-          _stations = localStations;
-          _applyFilters();
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _stations = localStations;
+            _applyFilters();
+            _isLoading = false;
+          });
+        }
       }
 
-      // Fetch fresh data from Turso API instead of Google Maps
-      final apiStations = await TursoService.fetchStations();
+      // Only try to fetch fresh data from Turso API if we have credentials
+      final tursoUrl = dotenv.env['TURSO_URL'];
+      final tursoToken = dotenv.env['TURSO_TOKEN'];
 
-      if (apiStations.isNotEmpty) {
-        // Save to database
-        await _databaseService.deleteAllStations();
-        await _databaseService.insertStations(apiStations);
+      if (tursoUrl != null &&
+          tursoUrl.isNotEmpty &&
+          tursoToken != null &&
+          tursoToken.isNotEmpty) {
+        try {
+          final apiStations = await TursoService.fetchStations();
 
-        setState(() {
-          _stations = apiStations;
-          _applyFilters();
-          _isLoading = false;
-        });
-      } else if (localStations.isEmpty) {
-        setState(() {
-          _errorMessage = 'No charging stations found';
-          _isLoading = false;
-        });
+          if (apiStations.isNotEmpty) {
+            // Save to database
+            await _databaseService.deleteAllStations();
+            await _databaseService.insertStations(apiStations);
+
+            if (mounted) {
+              setState(() {
+                _stations = apiStations;
+                _applyFilters();
+                _isLoading = false;
+              });
+            }
+          } else if (localStations.isEmpty) {
+            if (mounted) {
+              setState(() {
+                _errorMessage = 'No charging stations found';
+                _isLoading = false;
+              });
+            }
+          }
+        } catch (apiError) {
+          debugPrint('API fetch failed: $apiError');
+          // Continue with local data
+          if (localStations.isEmpty && mounted) {
+            setState(() {
+              _errorMessage =
+                  'No cached data available. Please configure API credentials.';
+              _isLoading = false;
+            });
+          }
+        }
+      } else {
+        // No credentials provided
+        if (localStations.isEmpty && mounted) {
+          setState(() {
+            _errorMessage =
+                'No charging stations cached. Please configure API credentials in .env';
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
-      // If API fails, try to use cached data
-      final localStations = await _databaseService.getAllStations();
-      if (localStations.isNotEmpty) {
+      debugPrint('Error loading stations: $e');
+      if (mounted) {
         setState(() {
-          _stations = localStations;
-          _applyFilters();
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _errorMessage = 'Failed to load stations: $e';
+          _errorMessage = 'Error loading stations: ${e.toString()}';
           _isLoading = false;
         });
       }
@@ -256,7 +383,9 @@ class _MapScreenState extends State<MapScreen> {
     });
 
     try {
-      debugPrint('Routing from ${_currentLocation!.latitude},${_currentLocation!.longitude} to ${destination.latitude},${destination.longitude}');
+      debugPrint(
+        'Routing from ${_currentLocation!.latitude},${_currentLocation!.longitude} to ${destination.latitude},${destination.longitude}',
+      );
       final routeData = await RouteService.getRoute(
         _currentLocation!,
         destination,
